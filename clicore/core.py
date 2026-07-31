@@ -5,9 +5,6 @@ import inspect
 from . import utils
 from .errors import *
 
-from rich.console import Console
-from rich.theme import Theme
-
 import logging
 logger = logging.getLogger(__name__)
 
@@ -16,15 +13,6 @@ class Parser:
         self._commands = {}
         self.alias_table = {}
         self._modules = {}
-
-        # Rich display stuff
-        theme = theme or Theme.read(
-            os.path.join(
-                os.path.sep.join(__file__.split(os.path.sep)[:-1]),
-                'default.rich'
-                )
-            )
-        self.console = Console(theme= theme)
 
     def _retrive_subcommand(self, command, arguments):
         while True:
@@ -376,23 +364,7 @@ class Context:
         self.directory = directory
         self.command = command
         self.parser = parser
-        self.console = parser.console
         self.flags = FlagDict()
-
-    def add_flag(self, name, value):
-        self.flags[name] = value
-
-    def print(self, message, *args, **kwargs):
-        self.console.print(message, *args, **kwargs)
-
-    def warn(self, message, *args, **kwargs):
-        self.print(message, style= 'warning', *args, **kwargs)
-
-    def info(self, message, *args, **kwargs):
-        self.print(message, style= 'info', *args, **kwargs)
-
-    def error(self, message, *args, **kwargs):
-        self.print(message, style= 'error', *args, **kwargs)
 
     @property
     def is_subcommand(self):
