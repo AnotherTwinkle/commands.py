@@ -1,6 +1,3 @@
-# clicore
+# commands.py
 
-## This library is still under development.
-
-A python library to easily create cli tools.
-Inspired from `discord.ext.commands`.
+Command framework to plug in anywhere.
