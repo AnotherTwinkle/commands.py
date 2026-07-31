@@ -8,10 +8,14 @@ from .errors import *
 from rich.console import Console
 from rich.theme import Theme
 
+import logging
+logger = logging.getLogger(__name__)
+
 class Parser:
     def __init__(self, theme : Theme = None):
         self._commands = {}
         self.alias_table = {}
+        self._modules = {}
 
         # Rich display stuff
         theme = theme or Theme.read(
@@ -137,15 +141,84 @@ class Parser:
                 commands.append(member)
         return commands
 
-    def load_module(self, module):
+    def register_module(self, module):
+        name = module.__class__.__name__
+
+        if (match := self._modules.get(name)) is not None:
+            if match != module:
+                raise ModuleAlreadyRegistered(f"A different module with the name {name} was already registered.")
+            else:
+                raise ModuleAlreadyRegistered(f"Module {name} was already reigstered.")
+            return
+
+        self._modules[name] = module
+
+        logger.info(f'Registering module {name} with {len(module._commands)} commands.')
+
         for command in module._commands:
             cmd = module._commands[command]
             cmd.module = module
             self.add_command(cmd)
 
+    def load_module(self, module):
+        # For now, we will automatically register a module if it wasnt already registered 
+        if module not in self._modules.values():
+            self.register_module(module)
+
+        module.loaded = True
+        module.on_load() # Call this at last
+
+    def unload_module(self, module):
+        name = module.__class__.__name__
+
+        if module not in self._modules.values():
+            raise ModuleError(f"Module {name} is not registered.")
+
+        if not module.loaded:
+            raise ModuleError(f"Module {name} is not loaded.")
+
+        module.on_unload()
+
     def remove_module(self, module):
+        # Since the module was loaded after registry, it suits to unload it before registry,
+        # the module's behaviour may depend on its commands being available
+        
+        self._modules.pop(module.__class__.__name__)
+
         for command in module._commands:
             self.remove_command(commmand)
+
+class Module:
+    def __new__(cls, *args, **kwargs):
+        newcls = super().__new__(cls)
+        newcls._commands = {}
+
+        # Add the commands 
+        for k, v in inspect.getmembers(newcls):
+            if isinstance(v, Command):
+                newcls._commands[k] = v
+
+        newcls.loaded = False
+
+        return newcls
+
+    @property
+    def display_name(self):
+        return utils.getattr(self, 'name') or self.__class__.__name__
+
+    @property
+    def display_description(self):
+        return utils.getattr(self, 'description') or self.__class__.__doc__
+
+    @property
+    def commands(self):
+        return [command for command in self._commands.values()]
+
+    def on_load(self):
+        pass
+
+    def on_unload(self):
+        pass
 
 class Command:
     def __init__(self, func, **kwargs):
@@ -231,7 +304,12 @@ class Command:
         except KeyError:
             raise
 
-    def invoke(self, ctx, *args, **kwargs):
+    def invoke(self, ctx, *args, **kwargs): 
+        # Before doing any parsing, we need to load our module
+        if not self.module.loaded:
+            logging.info(f'Loading module {self.module.__class__.__name__} upon invocation of commad "{self.name}"')
+            ctx.parser.load_module(self.module)
+
         args = dict(zip(self.params[1:], args))
 
         defaults = utils.get_default_args(self.callback)
@@ -346,29 +424,6 @@ class Converter:
     def convert(self, target):
         raise NotImplementedError('Derived classes need to implement this method.')
 
-class Module:
-    def __new__(cls, *args, **kwargs):
-        newcls = super().__new__(cls)
-        newcls._commands = {}
-
-        # Add the commands 
-        for k, v in inspect.getmembers(newcls):
-            if isinstance(v, Command):
-                newcls._commands[k] = v
-
-        return newcls
-
-    @property
-    def display_name(self):
-        return utils.getattr(self, 'name') or self.__class__.__name__
-
-    @property
-    def display_description(self):
-        return utils.getattr(self, 'description') or self.__class__.__doc__
-
-    @property
-    def commands(self):
-        return [command for command in self._commands.values()]
 
 # Decorators
 def command(**kwargs):

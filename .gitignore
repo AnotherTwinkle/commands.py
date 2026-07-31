@@ -23,3 +23,6 @@ tags
 # Notes
 notes.txt
 
+build/
+*.egg-info/
+

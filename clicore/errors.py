@@ -13,3 +13,12 @@ class CommandAlreadyRegistered(CommandError):
 class CommandNotProvided(CommandError):
     pass
 
+class ModuleError(Exception):
+    pass
+
+class ModuleAlreadyRegistered(ModuleError):
+    pass
+
+class ModuleAlreadyLoaded(ModuleError):
+    pass
+
