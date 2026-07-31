@@ -70,8 +70,8 @@ class Parser:
         ctx.command = command
         return command.invoke(ctx, *args, **flags)
 
-    def run(self, ctx):
-        """A high level method that handles much of the pre-parsing work for you."""
+    def run_cli(self, ctx):
+        """Point the library to CLI"""
 
         target = utils.safeget(sys.argv, 1,  None)
         args = sys.argv[2:]
@@ -102,7 +102,7 @@ class Parser:
         return flags, notflags
 
     def add_flag(self, name, **kwargs):
-        '''Calls clicore.add_flag. Use this to make command signatures look more elegant.'''
+        '''Calls commands.add_flag. Use this to make command signatures look more elegant.'''
         return add_flag(name, **kwargs)
 
     def command(self, **kwargs):

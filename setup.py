@@ -6,11 +6,11 @@ requirements = []
 with open('requirements.txt') as f:
     requirements = f.read().splitlines()
 
-setup(name = "clicore",
-        version = "0.4",
+setup(name = "commands.py",
+        version = "0.5",
         author = "AnotherTwinkle",
-        url = "https://www.github.com/AnotherTwinkle/clicore",
-        packages = ["clicore"],
+        url = "https://www.github.com/AnotherTwinkle/commands.py",
+        packages = ["commands"],
         install_requires = requirements,
         include_package_data = True,
         )
