@@ -9,12 +9,33 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Parser:
-    def __init__(self, theme : Theme = None):
+    ...
+
+class Context:
+    ...
+
+class Command:
+    ...
+
+class Module:
+    ...
+
+class Flag:
+    ...
+
+class FlagDict:
+    ...
+
+
+class Parser:
+    def __init__(self, require_context = False):
+        self.require_context = require_context
+
         self._commands = {}
         self.alias_table = {}
         self._modules = {}
 
-    def _retrive_subcommand(self, command, arguments):
+    def _retrieve_subcommand(self, command, arguments):
         while True:
             s = command._subcommand_alias_table.get(utils.safeget(arguments, 0))
             if s is not None:
@@ -25,20 +46,31 @@ class Parser:
 
         return (command, arguments)
 
-    def parse(self, name, arguments):
+    def parse(self, name, arguments, ctx : Context = None):
         name = self.alias_table.get(name, None)
         if name is None:
             raise CommandNotFound(f"{name} is not a registered command or alias.")
 
         command = self._commands.get(name, None)
-        command, arguments = self._retrive_subcommand(command, arguments)
+        command, arguments = self._retrieve_subcommand(command, arguments)
 
         flags, args = self.parse_flags(arguments)
-        ctx = Context(command= command, directory= os.getcwd(), parser= self)
 
+        if ctx is None:
+            if self.require_context:
+                raise CommandError(f"Context was not provided but is required by parser.")
+                return
+
+            logger.info(f"[{command.name}] No context was provided to parser. A context will be generated.")
+            ctx = Context(command= command, parser= self)
+
+        if not isinstance(ctx, Context):
+            raise TypeError(f"\"{ctx}\" is not an instance of {Context.__name__}")
+
+        ctx.command = command
         return command.invoke(ctx, *args, **flags)
 
-    def run(self):
+    def run(self, ctx):
         """A high level method that handles much of the pre-parsing work for you."""
 
         target = utils.safeget(sys.argv, 1,  None)
@@ -46,7 +78,7 @@ class Parser:
 
         if target is None:
             raise CommandNotProvided("No command was provided.")
-        return self.parse(target, args)
+        return self.parse(target, args, ctx = ctx)
 
     def parse_flags(self, args):
         flags, notflags = ({}, [])
@@ -342,6 +374,7 @@ class Command:
                     pass
 
             ctx.add_flag(flag, flags[flag])
+            logger.info("ctx.add_flag was called")
             self.flags[flag].passed = True
 
         args[self.params[0]] = ctx # Context
@@ -358,16 +391,26 @@ class Context:
     This argument can then be used to get 'context' of the command execution, and is the only way to
     access the flags passed to the command.
 
-    The context object also allows you to access the registered Command object of the command execution."""
+    The context object also allows you to access the registered Command object of the command execution.
 
-    def __init__(self, command, directory, parser, **kwargs):
-        self.directory = directory
-        self.command = command
+    [v0.5]
+    Context is intended to be subclassed, and applications may attach other necessary information with context
+
+    """
+
+    def __init__(self, parser, **kwargs):
+        self.command = kwargs.get("command") or None
         self.parser = parser
         self.flags = FlagDict()
 
+    def add_flag(self, name, value):
+        self.flags[name] = value
+
     @property
     def is_subcommand(self):
+        if not self.command:
+            return False
+
         return self.command.parent is not None
 
 class Flag:
@@ -395,7 +438,6 @@ class Converter:
 
     def convert(self, target):
         raise NotImplementedError('Derived classes need to implement this method.')
-
 
 # Decorators
 def command(**kwargs):
